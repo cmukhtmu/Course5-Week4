@@ -1,0 +1,155 @@
+---
+title: 'US Storm Data Analysis'
+author: "Mukarram Mukhtar"
+date: "03/16/2019"
+---
+    
+## 1. Synopsis
+In this article we'll make use of data from NOAA Storm Database. We'll try to answer some basic questions about severe weather events. We'll also show the code for the entire analysis. The analysis consists of tables, figures, and/or other summaries. We'll also use R package(s) to support our analysis. The two basic questions that we'll address in this analyis are:
+
+1. Across the United States, which types of events are most harmful with respect to population health?
+2. Across the United States, which types of events have the greatest economic consequences?
+
+Before we begin the step-by-step process, we'll load the necessary libraries for the rest of the steps in process:
+    
+```{r}
+library(data.table)
+library(ggplot2)
+library(gridExtra)
+library(ggpubr)
+library(dplyr)
+```
+
+## 2. Data Processing
+
+#### 2.1 Downloading the zip file
+```{r}
+if(!file.exists("./StormData.csv.bz2"))
+{
+    download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "./StormData.csv.bz2")
+}
+```
+
+#### 2.2 Loading the data
+
+Once the file is available, then we'll read the file in data frame:
+```{r}
+if(file.exists("./StormData.csv.bz2"))
+{
+    dtStorm = read.table("StormData.csv.bz2", header = TRUE, sep = ",", quote = "\"")
+}
+```
+#### 2.3 Calculating weather related injuries and fatalities.
+
+##### 2.3.1 Data Transformations:
+In order to calculate the number of injuries and fatalities, we must group the data table by EVTYPE and sum the injuries and fatalities respectively. Moreover, we need to sort the respective tables in descending order. Finally, we pick up the top 10 items.
+
+```{r}
+storm_most_injuries = group_by(dtStorm, EVTYPE) %>% 
+                        summarise(total = sum(INJURIES))
+storm_most_injuries = storm_most_injuries[order(storm_most_injuries$total,decreasing = T),]
+storm_most_injuries = head(storm_most_injuries, 10)
+
+storm_most_fatalities = group_by(dtStorm, EVTYPE) %>% 
+                        summarise(total = sum(FATALITIES))
+storm_most_fatalities = storm_most_fatalities[order(storm_most_fatalities$total,decreasing = T),]
+storm_most_fatalities = head(storm_most_fatalities, 10)
+```
+
+#### 2.4 Calculating weather related property and crop damages
+
+##### 2.4.1 First we'll create a function to calculate damages in USD:
+```{r}
+getDMGValue <- function(row, DMG, DMGEXP, DMGVALUEEXP)
+{
+    DMGVALUE = 0
+    
+    if(row[DMGEXP] == "H") 
+    {
+        DMGVALUE = as.numeric(row[DMG]) * 100 
+    }
+    else if(row[DMGEXP] == "K") 
+    {
+        DMGVALUE = as.numeric(row[DMG]) * 1000 
+    }
+    else if(row[DMGEXP] == "M") 
+    {
+        DMGVALUE = as.numeric(row[DMG]) * 10^6 
+    }
+    else if(row[DMGEXP] == "B") 
+    {
+        DMGVALUE = as.numeric(row[DMG]) * 10^9 
+    }
+    
+    row[DMGVALUEEXP] = DMGVALUE
+}
+
+```
+##### 2.4.2 Calculating USD amounts...
+
+```{r}
+dtStorm$PROPDMGVALUE = apply(dtStorm, 1, getDMGValue, "PROPDMG", "PROPDMGEXP", "PROPDMGVALUE")
+dtStorm$CROPDMGVALUE = apply(dtStorm, 1, getDMGValue, "CROPDMG", "CROPDMGEXP", "CROPDMGVALUE")
+
+propertyDamages = group_by(dtStorm, EVTYPE) %>%
+            summarise(total = sum(PROPDMGVALUE))
+propertyDamages = propertyDamages[order(propertyDamages$total,decreasing = T),]
+propertyDamages = head(propertyDamages, 10)
+        
+cropDamages = group_by(dtStorm, EVTYPE) %>%
+            summarise(total = sum(CROPDMGVALUE))
+cropDamages = cropDamages[order(cropDamages$total,decreasing = T),]
+cropDamages = head(cropDamages, 10)
+```
+## 3. Results
+
+##### 3.1 Biggest weather related events most harmful to human health (Injuries):
+```{r}
+storm_most_injuries
+```
+##### 3.2 Biggest weather related events most harmful to human health (Fatalities):
+```{r}
+storm_most_fatalities
+```
+##### 3.3 Charts of weather related injuries/fatalities:
+```{r}
+p1 = ggplot(storm_most_injuries, aes(EVTYPE, total)) +
+    geom_bar(stat = "identity") +
+    theme(axis.text.x = element_text(angle=90)) +
+    ggtitle("Injuries by Event Types") +
+    xlab("Event Type") + ylab("Injuries")
+
+p2 = ggplot(storm_most_fatalities, aes(EVTYPE, total)) +
+    geom_bar(stat = "identity") +
+    theme(axis.text.x = element_text(angle=90)) +
+    ggtitle("Fatalities by Event Types") +
+    xlab("Event Type") + ylab("Fatalities")
+
+ggarrange(p1, p2)
+
+```
+
+##### 3.4 Biggest weather related events having economic consequences (Property Damages):
+```{r}
+propertyDamages
+```
+##### 3.5 Biggest weather related events having economic consequences (Crop Damages):
+```{r}
+cropDamages
+```
+##### 3.6 Drawing charts:
+```{r}
+p1 = ggplot(propertyDamages, aes(EVTYPE, total)) +
+    geom_bar(stat = "identity") +
+    theme(axis.text.x = element_text(angle=90)) +
+    ggtitle("Property Damage by Event Types") +
+    xlab("Event Type") + ylab("Property Damages in USD")
+
+p2 = ggplot(cropDamages, aes(EVTYPE, total)) +
+    geom_bar(stat = "identity") +
+    theme(axis.text.x = element_text(angle=90)) +
+    ggtitle("Crop Damage by Event Types") +
+    xlab("Event Type") + ylab("Crop Damages in USD")
+
+ggarrange(p1, p2)
+```

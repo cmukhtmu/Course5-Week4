@@ -1,0 +1,10 @@
+name: Publish Document
+title:
+username:
+account: rpubs
+server: rpubs.com
+hostUrl: rpubs.com
+appId: https://api.rpubs.com/api/v1/document/476900/99c24800dc0d453684c77df7a945fee1
+bundleId: https://api.rpubs.com/api/v1/document/476900/99c24800dc0d453684c77df7a945fee1
+url: http://rpubs.com/mukarram/476900
+when: 1553008440.92538
